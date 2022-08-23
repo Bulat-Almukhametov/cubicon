@@ -1,17 +1,23 @@
 import "./App.scss";
-import { BrowserRouter, Routes, Route, Navigate, NavLink } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, NavLink, useLocation } from "react-router-dom";
 import EditContestForm from "./components/EditContestForm";
 import ContestsList from "./components/ContestsList";
 import EditResults from "./components/EditResults";
 import ErrorIcon from '@mui/icons-material/Error';
 import CancelIcon from '@mui/icons-material/Cancel';
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Notification } from './models/state';
 import { createTheme, ThemeProvider } from "@mui/material";
 import UserProfilePage from "./components/UserProfilePage";
 
 const App = () => {
     const [notifications, setNotifications] = useState<Notification[]>([]);
+    const location = useLocation();
+
+    // remove notifications on url change
+    useEffect(() => {
+        setNotifications([]);
+    }, [location])
 
     const addNotification = useCallback((notification: Notification) => {
         setNotifications(notifications => {
@@ -34,7 +40,6 @@ const App = () => {
     });
 
     return (
-        <BrowserRouter>
             <ThemeProvider theme={darkTheme}>
                 <nav className="nav-menu">
                     <NavLink to="/contests?showUpcoming=true" className={({ isActive }) =>(isActive ? " active" : "")}>КОНТЕСТЫ</NavLink>
@@ -54,7 +59,7 @@ const App = () => {
                                     addNotification={addNotification}
                                     isEditingMode={false}/>}
                             ></Route>
-                            <Route path="/users/:id" element={<UserProfilePage />}></Route>
+                            <Route path="/users/:id" element={<UserProfilePage addNotification={addNotification}/>}></Route>
                             <Route path="/" element={<Navigate to="/contests?showUpcoming=true" />}></Route>
                         </Routes>
                     </div>
@@ -76,7 +81,6 @@ const App = () => {
                     : <div></div>
                 }
             </ThemeProvider>
-        </BrowserRouter>
     );
 }
 

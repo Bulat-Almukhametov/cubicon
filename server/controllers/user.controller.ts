@@ -7,7 +7,7 @@ export const getAllUsers = async (req: any, res: any) => {
         res.status(200).json(users);
     }
     catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }   
 };
 
@@ -23,7 +23,7 @@ export const postUser = async (req: any, res: any) => {
     catch (error: any) {
         console.log(error);
         
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }   
 };
 
@@ -56,7 +56,7 @@ export const deleteUser = async (req: any, res: any) => {
         res.status(200).json(deletedUser);
     }
     catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }   
 };
 
@@ -75,7 +75,7 @@ export const updateUser = async (req: any, res: any) => {
         res.status(200).json(updatedUser);
     }
     catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }   
 };
 
@@ -92,7 +92,7 @@ export const getUser = async (req: any, res: any) => {
         res.status(200).json(user);
     }
     catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     } 
 }
 
@@ -113,7 +113,7 @@ export const getUserContestsCount = async (req: any, res: any) => {
         res.status(200).json(contestsCount);
     }
     catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     } 
 }
 
@@ -164,6 +164,6 @@ export const getUserResultsAndTotalCount = async (req: any, res: any) => {
         });
     }
     catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     } 
 }

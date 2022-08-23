@@ -11,7 +11,11 @@ import { Contest, ErrorHandlerProps, User, UserOption } from '../models/state';
 import { getBestAndAverage, toDelimitedString, toMilliseconds } from '../services/results-service';
 import './EditResults.scss';
 import FormButton from './shared/FormButton';
+import ContestNotFound from './shared/ContestNotFound';
 import UsersAutocomplete from './shared/UsersAutocomplete';
+import Loading from './shared/Loading';
+import { HttpResponseStatusCode } from '../enums';
+import { handleResponses } from '../services/http-response.service';
 
 // TODO use this model for input row only. The values should not be null for the results
 type ResultUIItem = {
@@ -31,11 +35,9 @@ type ResultUIItem = {
 
     // indicates that the result was added using UI and not sent to backend yet
     isAdded: boolean,
-
 }
 
 type ResulstFormState = {
-    loaded: boolean,
     selectedRoundId: number,
     contestResults: ResultUIItem[],
     editingResult: ResultUIItem,
@@ -46,6 +48,14 @@ type ResulstFormState = {
 
 type ResultsComponentProps = ErrorHandlerProps & {
     isEditingMode: boolean,
+}
+
+enum EditResultsPageStatus {
+    Idle,
+    Loading,
+    Loaded,
+    ContestNotFound,
+    Error,
 }
 
 // TODO use react-hook-form for form handling
@@ -77,7 +87,6 @@ const EditResults = (props: ResultsComponentProps) => {
     }, []);
 
     const [ state, setState ] = useState<ResulstFormState>({
-        loaded: false,
         contest: null,
         selectedRoundId: 0,
         contestResults: [],
@@ -85,67 +94,78 @@ const EditResults = (props: ResultsComponentProps) => {
     });
     const [ selectedUserOption, setSelectedUserOption ] = useState<UserOption | null>(null);
     const [ allUserOptions, setAllUserOptions ] = useState<UserOption[]>([]);
+    const [ status, setStatus ] = useState<EditResultsPageStatus>(EditResultsPageStatus.Idle);
 
     const addNotification = props.addNotification;
 
     useEffect(() => {
-        const contestIdNumber = Number(contestId);
+        const contestIdNum = Number(contestId);
 
-        if (contestIdNumber > 0) {
-            const getContest = fetch(`${process.env.REACT_APP_BACKEND_SERVER_URL}/contests/${contestIdNumber}`, {
-                method: 'GET',
-                headers: {'Content-Type': 'application/json'},
-            }).then(r => r.json());
+        if (isNaN(contestIdNum) || contestIdNum < 0) {
+            addNotification({ message: 'Произошла ошибка при загрузке контеста. Повторите попытку позже.' });
+            setStatus(EditResultsPageStatus.Error);
 
-            const getUsers = fetch(`${process.env.REACT_APP_BACKEND_SERVER_URL}/users`, {
-                method: 'GET',
-                headers: {'Content-Type': 'application/json'},
-            }).then(r => r.json());
-
-            // TODO error handling
-            Promise.all([ getContest, getUsers ])
-                .then(([contest, users]) => {
-                    // TODO find a way to preserve return types
-                    setAllUserOptions(users.map((u: User) => {
-                        return new UserOption(u.id, false, u.firstName, u.lastName);
-                    }));
-
-                    const contestResults = (contest as Contest).rounds.flatMap(round => round.results).map(r => {
-                        const resultUIItem = {
-                            id: r.id,
-                            attempt1: toDelimitedString(r.attempt1),
-                            attempt2: toDelimitedString(r.attempt2),
-                            attempt3: toDelimitedString(r.attempt3),
-                            attempt4: toDelimitedString(r.attempt4),
-                            attempt5: toDelimitedString(r.attempt5),
-                            best: toDelimitedString(r.best),
-                            average: toDelimitedString(r.average),
-                            performedBy: r.performedBy,
-                            roundId: r.roundId,
-                        } as ResultUIItem;
-
-                        return resultUIItem;
-                    });
-
-                    setState({
-                        loaded: true,
-                        contest,
-                        selectedRoundId: contest.rounds[0].id,
-                        contestResults,
-                        editingResult: defaultEditingResult,
-                    });
-                })
-                .catch(() => {
-                    setState(state => {
-                        return {
-                            ...state,
-                            loaded: true,
-                        }
-                    });
-
-                    addNotification({ message: 'Произошла ошибка при загрузке контеста. Повторите попытку позже.' });
-                });
+            return;
         }
+
+        const getContest = fetch(`${process.env.REACT_APP_BACKEND_SERVER_URL}/contests/${contestIdNum}`, {
+            method: 'GET',
+            headers: {'Content-Type': 'application/json'},
+        });
+
+        const getUsers = fetch(`${process.env.REACT_APP_BACKEND_SERVER_URL}/users`, {
+            method: 'GET',
+            headers: {'Content-Type': 'application/json'},
+        });
+
+        // TODO error handling
+        Promise.all([ getContest, getUsers ])
+            .then(responses => {
+                handleResponses(responses);
+
+                return Promise.all(responses.map(r => r.json()));
+            })
+            .then(([contest, users]) => {
+                // TODO find a way to preserve return types
+                setAllUserOptions(users.map((u: User) => {
+                    return new UserOption(u.id, false, u.firstName, u.lastName);
+                }));
+
+                const contestResults = (contest as Contest).rounds.flatMap(round => round.results).map(r => {
+                    const resultUIItem = {
+                        id: r.id,
+                        attempt1: toDelimitedString(r.attempt1),
+                        attempt2: toDelimitedString(r.attempt2),
+                        attempt3: toDelimitedString(r.attempt3),
+                        attempt4: toDelimitedString(r.attempt4),
+                        attempt5: toDelimitedString(r.attempt5),
+                        best: toDelimitedString(r.best),
+                        average: toDelimitedString(r.average),
+                        performedBy: r.performedBy,
+                        roundId: r.roundId,
+                    } as ResultUIItem;
+
+                    return resultUIItem;
+                });
+
+                setState({
+                    contest,
+                    selectedRoundId: contest.rounds[0].id,
+                    contestResults,
+                    editingResult: defaultEditingResult,
+                });
+                setStatus(EditResultsPageStatus.Loaded);
+            })
+            .catch((err) => {
+                if (err.message === HttpResponseStatusCode.NoContent.toString()) {
+                    // do not show notification for empty response
+                    setStatus(EditResultsPageStatus.ContestNotFound);
+                    return;
+                }
+
+                setStatus(EditResultsPageStatus.Error);
+                addNotification({ message: 'Произошла ошибка при загрузке контеста. Повторите попытку позже.' });
+            });
     }, [ addNotification, contestId, defaultEditingResult ]);
     
     const getAttemptsMs = (result: ResultUIItem) => {
@@ -385,11 +405,13 @@ const EditResults = (props: ResultsComponentProps) => {
             body: JSON.stringify(results),
         });
 
-        if (!res.ok) {
-            addNotification({ message: 'Произошла ошибка при сохранении результатов. Повторите попытку позже.' });
-        }
-
         goToContestsList();
+
+        if (!res.ok) {
+            setTimeout(() => {
+                props.addNotification({ message: 'Произошла ошибка при сохранении результатов. Повторите попытку позже.' });
+            }, 0);
+        }
     }
 
     const onGoBackClick = () => {
@@ -603,10 +625,11 @@ const EditResults = (props: ResultsComponentProps) => {
         </div>
 
     // TODO create fancy spinner
-    if (!state.loaded) return <div>Загрузка...</div>;
+    if (status === EditResultsPageStatus.Loading) return <Loading></Loading>;
 
-    // TODO create empty box
-    if (!state.contest) return <div>Контест не найден, попробуйте попытку позже.</div>;
+    // check for contest to get rid of '?' sign in the main markup
+    if (!state.contest || [EditResultsPageStatus.Error, EditResultsPageStatus.ContestNotFound].find(s => s === status)) 
+        return <ContestNotFound></ContestNotFound>
 
     else return (
         <>

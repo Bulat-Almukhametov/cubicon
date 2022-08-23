@@ -16,7 +16,7 @@ export const getAllResults = async (req: any, res: any) => {
         res.status(200).json(results);
     }
     catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }   
 };
 
@@ -142,7 +142,7 @@ export const deleteResult = async (req: any, res: any) => {
         res.status(200).json(deletedResult);
     }
     catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }   
 };
 
@@ -161,7 +161,7 @@ export const updateResult = async (req: any, res: any) => {
         res.status(200).json(updatedResult);
     }
     catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }   
 };
 

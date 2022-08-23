@@ -12,7 +12,7 @@ export const getAllRounds = async (req: any, res: any) => {
         res.status(200).json(allRounds);
     }
     catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }   
 };
 
@@ -24,7 +24,7 @@ export const createRound = async (req: any, res: any) => {
         res.status(204).json(createdRound);
     }
     catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }   
 };
 
@@ -41,7 +41,7 @@ export const deleteRound = async (req: any, res: any) => {
         res.status(200).json(deletedRound);
     }
     catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }   
 };
 
@@ -60,6 +60,6 @@ export const updateRound = async (req: any, res: any) => {
         res.status(200).json(updatedRound);
     }
     catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }   
 };
