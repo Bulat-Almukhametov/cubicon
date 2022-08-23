@@ -6,11 +6,18 @@ import './ContestsList.scss';
 import EditIcon from '@mui/icons-material/Edit';
 import FormButton from './shared/FormButton';
 import CampaignIcon from '@mui/icons-material/Campaign';
+import Loading from './shared/Loading';
 
 type ContestsListState = {
-    isLoaded: boolean,
     allContests: Contest[],
     showUpcoming: boolean,
+}
+
+enum ContestListPageStatus {
+    Idle,
+    Loading,
+    Error,
+    Loaded,
 }
 
 const ContestList = (props: ErrorHandlerProps) => {
@@ -23,8 +30,8 @@ const ContestList = (props: ErrorHandlerProps) => {
     const isAdmin: boolean = params.get('isAdmin') === 'true';
     const showUpcoming: boolean = params.get('showUpcoming') === 'true';
 
+    const [ pageStatus, setPageStatus ] = useState<ContestListPageStatus>(ContestListPageStatus.Idle);
     const [ state, setState ] = useState<ContestsListState>({ 
-        isLoaded: false,
         allContests: [],
         showUpcoming,
     });
@@ -33,8 +40,17 @@ const ContestList = (props: ErrorHandlerProps) => {
 
     // initial loading of contests
     useEffect(() => {
+        setPageStatus(ContestListPageStatus.Loading);
+
         fetch(`${process.env.REACT_APP_BACKEND_SERVER_URL}/contests`)
-            .then(v => v.json())
+            .then((response: Response) => {
+
+                if (!response.ok) {
+                    throw new Error(response.statusText);
+                }
+
+                return response.json();
+            })
             .then((contests) => {
                 contests = contests.map((c: any) => {
                     c.date = new Date(c.date);
@@ -42,22 +58,16 @@ const ContestList = (props: ErrorHandlerProps) => {
                     return c;
                 });
 
+                setPageStatus(ContestListPageStatus.Loaded);
                 setState((state) => {
                     return {
                         ...state,
-                        isLoaded: true,
                         allContests: contests,
                     };
                 });
             })
             .catch(() => {
-                setState(state => {
-                    return {
-                        ...state,
-                        loaded: true,
-                    }
-                });
-
+                setPageStatus(ContestListPageStatus.Error);
                 addNotification({ message: 'Произошла ошибка при загрузке контестов. Повторите попытку позже.' });
             });
     }, [addNotification])  
@@ -83,9 +93,9 @@ const ContestList = (props: ErrorHandlerProps) => {
     }
 
     // TODO refactor navigation - move showUpcoming, isAdmin to the redux state
-    const onContestItemClick = (event: any, contest: Contest) => {
+    const onContestItemClick = (event: React.MouseEvent<HTMLDivElement, MouseEvent>, contest: Contest) => {
         event.stopPropagation();
-       
+
         const pageUrl = isAdmin && contest.status !== ContestStatus.PUBLISHED
             ? 'edit-results'
             : 'results';
@@ -93,22 +103,30 @@ const ContestList = (props: ErrorHandlerProps) => {
         navigate(`./${contest.id}/${pageUrl}${search}`);
     }
 
-    const onDeleteClick = async (contestId: number) => {
+    const onDeleteContestClick = async (event: React.MouseEvent<SVGSVGElement, MouseEvent>, contestId: number) => {
+        event.stopPropagation();
+
+        const itemsBeforeDelete = state.allContests;
+
+        setPageStatus(ContestListPageStatus.Loading);
+
         const response = await fetch(`${process.env.REACT_APP_BACKEND_SERVER_URL}/contests/${contestId}`, {
             method: 'DELETE',
             headers: {'Content-Type': 'application/json'},
         });
 
-        // TODO add error handling
-        if (!response.ok) return;
+        setPageStatus(ContestListPageStatus.Loaded);
 
-        const updatedItems = [...state.allContests].filter(c => c.id !== contestId);
+        if (!response.ok) {
+            addNotification({ message: 'Произошла ошибка при удалении контеста. Повторите попытку позже.' });
+
+            return;
+        };
 
         setState(state => {
             return {
                 ...state,
-                isLoaded: true,
-                allContests: updatedItems,
+                allContests: itemsBeforeDelete.filter(c => c.id !== contestId),
             };
         });
     }
@@ -127,23 +145,29 @@ const ContestList = (props: ErrorHandlerProps) => {
         });
     }
 
-    const publishContest = async (event: any, contestId: number) => {
+    const onPublishContestClick = async (event: any, contestId: number) => {
         event.stopPropagation();
 
         const contest = state.allContests.find(c => c.id === contestId);
         
         if (!contest) {
+            addNotification({ message: 'Произошла ошибка при загрузке контестов. Повторите попытку позже.' });
             throw new Error(`Контест с id = ${contestId} не найден.`);
         }
+               
+        setPageStatus(ContestListPageStatus.Loading);
 
         const response = await fetch(`${process.env.REACT_APP_BACKEND_SERVER_URL}/contests/${contestId}/publish`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
         });
 
-        // TODO add error handling
+        setPageStatus(ContestListPageStatus.Loaded);
+
         if (!response.ok) {
-            throw new Error('Ошибка при сохранении контеста.')
+            addNotification({ message: 'Произошла ошибка при загрузке контестов. Повторите попытку позже.' });
+
+            return;
         }
 
         setState(state => {
@@ -164,7 +188,7 @@ const ContestList = (props: ErrorHandlerProps) => {
 
         return (
             <>
-                <button className='action-button' disabled={c.status === ContestStatus.NEW} onClick={(e) => publishContest(e, c.id) }>  
+                <button className='action-button' disabled={c.status === ContestStatus.NEW} onClick={(e) => onPublishContestClick(e, c.id) }>  
                     <CampaignIcon 
                         className="action-icon" 
                     >
@@ -176,7 +200,7 @@ const ContestList = (props: ErrorHandlerProps) => {
                 </button>
 
                 <button className='action-button'>
-                    <DeleteForeverIcon className="action-icon" onClick={() => { onDeleteClick(c.id); }}></ DeleteForeverIcon>
+                    <DeleteForeverIcon className="action-icon" onClick={(e) => { onDeleteContestClick(e, c.id); }}></ DeleteForeverIcon>
                 </button>
             </>
         );
@@ -223,25 +247,30 @@ const ContestList = (props: ErrorHandlerProps) => {
     return (
         <>
             <div className="tabs">
-                <h2 className={state.showUpcoming ? 'active' : ''} onClick={() => { toggleContestTab(true) } }>Предстоящие</h2>
                 <h2 className={state.showUpcoming ? '' : 'active'} onClick={() => { toggleContestTab(false) } }>Прошедшие</h2>
-            </div>
-
-            <div className="list-container">
-                {
-                    !displayedContests.length 
-                        ? <div style={{ 'padding': '20px' }}>
-                            Нет {state.showUpcoming ? ' предстоящих' : 'прошедших'} контестов
-                        </div>
-                        : displayedContests.map(c =>  getContestItem(c))
-                }
+                <h2 className={state.showUpcoming ? 'active' : ''} onClick={() => { toggleContestTab(true) } }>Предстоящие</h2>
             </div>
 
             {
-                isAdmin &&
-                <div className="actions-container">
-                    <FormButton onClick={() => { navigate(`./0/edit${search}`)}} disabled={false} text="Создать контест"></FormButton>
-                </div>
+                pageStatus === ContestListPageStatus.Loading && <Loading></Loading>
+            }
+            {
+                pageStatus === ContestListPageStatus.Loaded && 
+                <>
+                    <div className="list-container">
+                        {
+                            displayedContests.length
+                                ? displayedContests.map(c =>  getContestItem(c))
+                                : <>Нет {state.showUpcoming ? ' предстоящих' : 'прошедших'} контестов</>
+                        }
+                    </div>
+                    {
+                        isAdmin && 
+                        <div className="actions-container">
+                            <FormButton onClick={() => { navigate(`./0/edit${search}`)}} disabled={false} text="Создать контест"></FormButton>
+                        </div>
+                    }
+                </>
             }
         </>
     )

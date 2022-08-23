@@ -8,6 +8,9 @@ import { ErrorHandlerProps, User, UserOption, RoundFormat } from "../models/stat
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import FormButton from "./shared/FormButton";
 import UsersAutocomplete from "./shared/UsersAutocomplete";
+import ContestNotFound from "./shared/ContestNotFound";
+import { HttpResponseStatusCode } from "../enums";
+import Loading from "./shared/Loading";
 
 type RoundItem = {
     name: string,
@@ -24,6 +27,14 @@ type ContestFormState = {
     allUserOptions: UserOption[],
 }
 
+enum EditContestPageStatus {
+    Idle,
+    Loading,
+    Loaded,
+    ContestNotFound,
+    Error,
+}
+
 // TODO
 // test date locales
 // add other events, 4x4, 5x5 etc
@@ -33,6 +44,7 @@ const EditContestForm = (props: ErrorHandlerProps) => {
     const { id: contestId } = useParams();
     const { search } = useLocation();
     const contestIdNum =  Number(contestId);
+    const isAddNewMode = contestIdNum === 0;
 
     const availableRounds: RoundItem[] = [
         { name: '3x3 финал', format: RoundFormat.AVERAGE_OF_5 },
@@ -51,55 +63,93 @@ const EditContestForm = (props: ErrorHandlerProps) => {
     });
 
     const [ selectedUserOption, setSelectedUserOption ] = useState<UserOption | null>(null);
+    const [ status, setStatus ] = useState<EditContestPageStatus>(EditContestPageStatus.Idle);
+    const { addNotification } = props;
 
     useEffect(() => {
-        const getContestInfo = contestIdNum > 0 
-            ? fetch(`${process.env.REACT_APP_BACKEND_SERVER_URL}/contests/${contestIdNum}`, 
+        if (isNaN(contestIdNum) || contestIdNum < 0) {
+            addNotification({ message: 'Произошла ошибка при загрузке контеста. Повторите попытку позже.' });
+            setStatus(EditContestPageStatus.Error);
+
+            return;
+        }
+
+        setStatus(EditContestPageStatus.Loading);
+
+        const getContestInfo = isAddNewMode 
+            ? Promise.resolve(null)
+            : fetch(`${process.env.REACT_APP_BACKEND_SERVER_URL}/contests/${contestIdNum}`, 
             {
                 method: 'GET',
                 headers: {'Content-Type': 'application/json'},
-            })
-            : Promise.resolve(null);
-
+            });
+        
         const getUsers = fetch(`${process.env.REACT_APP_BACKEND_SERVER_URL}/users`, {
             method: 'GET',
             headers: {'Content-Type': 'application/json'},
-        })
+        });
 
         // TODO refactor - when there are too many users, it will slow down the app. Do not load all users at once
         Promise.all([getContestInfo, getUsers])
-            .then(r => Promise.all(r.map(res => !res ? Promise.resolve(null) : res.json())))
+            .then(responses => {
+                const failedResponse = responses.find(r => r && r.status !== HttpResponseStatusCode.OK && r.status !== HttpResponseStatusCode.NoContent);
+                if (failedResponse)
+                    throw new Error(failedResponse.status.toString());
+
+                if (responses.find(r => !!r && r.status === HttpResponseStatusCode.NoContent))
+                    throw new Error(HttpResponseStatusCode.NoContent.toString());
+
+                return Promise.all(responses.map(res => !res ? Promise.resolve(null) : res.json()));
+            })
             .then(([contestInfo, users]) => {
-                if (contestInfo) {
-                    // populate form with contest data
-                    setFormState({
-                        name: contestInfo.name,
-                        city: contestInfo.city,
-                        date: contestInfo.date,
-                        vkLink: contestInfo.vkUrl,
-                        organizedById: contestInfo.organizedById,
-                        rounds: contestInfo.rounds,
-                        allUserOptions: [],
+                const allUserOptions = users.map((u: User) => {
+                    return { displayName: getUserDisplayName(u), userId: u.id, disabled: false };
+                });
+
+                if (isAddNewMode) {
+                    setFormState((state) => {
+                        return {
+                            ...state,
+                            allUserOptions,
+                        }
                     });
 
-                    // preselect organizer autocomplete with contest data
-                    setSelectedUserOption({ 
-                        userId: contestInfo.organizedById, 
-                        disabled: false, 
-                        displayName: getUserDisplayName(users.find((u: User) => u.id === contestInfo.organizedById)),
-                    });
+                    setStatus(EditContestPageStatus.Loaded);
+
+                    return;
                 }
 
-                setFormState(state => {
-                    return {
-                        ...state,
-                        allUserOptions: users.map((u: User) => {
-                            return { displayName: getUserDisplayName(u), userId: u.id, disabled: false };
-                        }),
-                    }
-                })
-            });
-    }, [contestIdNum]);
+                // populate form with contest data
+                setFormState({
+                    name: contestInfo.name,
+                    city: contestInfo.city,
+                    date: contestInfo.date,
+                    vkLink: contestInfo.vkUrl,
+                    organizedById: contestInfo.organizedById,
+                    rounds: contestInfo.rounds,
+                    allUserOptions,
+                });
+
+                // preselect organizer autocomplete with contest data
+                setSelectedUserOption({ 
+                    userId: contestInfo.organizedById, 
+                    disabled: false, 
+                    displayName: getUserDisplayName(users.find((u: User) => u.id === contestInfo.organizedById)),
+                });
+
+                setStatus(EditContestPageStatus.Loaded);
+            })
+            .catch((err) => {
+                if (err.message === HttpResponseStatusCode.NoContent.toString()) {
+                    // do not show notification for empty response
+                    setStatus(EditContestPageStatus.ContestNotFound);
+                    return;
+                }
+
+                setStatus(EditContestPageStatus.Error);
+                addNotification({ message: 'Произошла ошибка при загрузке контеста. Повторите попытку позже.' });
+            })
+    }, [contestIdNum, isAddNewMode, addNotification]);
 
     const onOrganizerSelect = (userOption: UserOption) => {
         setSelectedUserOption(userOption);
@@ -125,7 +175,9 @@ const EditContestForm = (props: ErrorHandlerProps) => {
         return `${user.firstName} ${user.lastName}`;
     }
 
-    const handleSubmit = async () => {
+    const onSubmitButtonClick = async () => {
+        setStatus(EditContestPageStatus.Loading)
+
         const formData = {
             "name": formState.name,
             "vkUrl": formState.vkLink,
@@ -135,30 +187,29 @@ const EditContestForm = (props: ErrorHandlerProps) => {
             "organizedById": formState.organizedById,
         };
 
-        let response;
-
-        if (contestIdNum === 0) {
-            response = await fetch(`${process.env.REACT_APP_BACKEND_SERVER_URL}/contests/`,
+        const response = contestIdNum === 0
+            ? await fetch(`${process.env.REACT_APP_BACKEND_SERVER_URL}/contests/`,
             {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(formData),
-            });
-        } else {
-            response = await fetch(`${process.env.REACT_APP_BACKEND_SERVER_URL}/contests/${contestId}`,
+            })
+            : await fetch(`${process.env.REACT_APP_BACKEND_SERVER_URL}/contests/${contestId}`,
             {
                 method: 'PUT',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(formData),
             });
+
+            navigate('../contests?isAdmin=true');
+
+            // hack to prevent clearing the notifications after url change
+            if (!response.ok) {
+                setTimeout(() => {
+                    props.addNotification({ message: 'Произошла ошибка при сохранении контеста. Повторите попытку позже.' });
+                }, 0);
+            }
         }
-
-        if (!response.ok) {
-            props.addNotification({ message: 'Произошла ошибка при сохранении контеста. Повторите попытку позже.' });
-        };
-
-        navigate('../contests?isAdmin=true');
-    }
 
     const addNewRound = () => {
         const addedRounds = formState.rounds;
@@ -224,145 +275,155 @@ const EditContestForm = (props: ErrorHandlerProps) => {
 
     return (
         <>
-            <div className="info-container">
-                {contestIdNum === 0 ? 'Создание нового контеста' : formState.name + ' - Редактирование контеста'}
-            </div>
-            <div inline-datepicker="true" data-date="02/25/2022"></div>
-            <div className="create-contest-form">
-                <table className="main-info-table">
-                    <tbody>
-                        <tr>
-                            <td>
-                                <label id="organizer-label" htmlFor="organizer-input">Организатор *</label>
-                            </td>
-                            <td>
-                                <UsersAutocomplete 
-                                    allUserOptions={formState.allUserOptions} 
-                                    selectedUserOption={selectedUserOption}
-                                    onUserSelect={onOrganizerSelect}
-                                    onUserReset={onOrganizerReset}
-                                >
-                                </UsersAutocomplete>
-                            </td>
-                            <td>
-                                <label className="date-label">Дата проведения</label>
-                            </td>
-                            <td>
-                                <LocalizationProvider dateAdapter={AdapterMoment}>
-                                    <DatePicker
-                                        shouldDisableDate={(date: moment.Moment) => {
-                                            // disable previous days, but allow today
-                                            const today = moment().toDate();
-                                            today.setHours(0);
-                                            today.setMinutes(0);
-                                            today.setSeconds(0);
-                                            today.setMilliseconds(0);
+            {
+                status === EditContestPageStatus.Loading && <Loading></Loading>
+            }
+            {
+                [ EditContestPageStatus.ContestNotFound, EditContestPageStatus.Error ].find(s => s === status) && <ContestNotFound></ContestNotFound>
+            }
+            {
+                status === EditContestPageStatus.Loaded &&
+                <>
+                    <div className="info-container">
+                        {contestIdNum === 0 ? 'Создание нового контеста' : formState.name + ' - Редактирование контеста'}
+                    </div>
+                    <div inline-datepicker="true" data-date="02/25/2022"></div>
+                    <div className="create-contest-form">
+                        <table className="main-info-table">
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <label>Организатор *</label>
+                                    </td>
+                                    <td>
+                                        <UsersAutocomplete 
+                                            allUserOptions={formState.allUserOptions} 
+                                            selectedUserOption={selectedUserOption}
+                                            onUserSelect={onOrganizerSelect}
+                                            onUserReset={onOrganizerReset}
+                                        >
+                                        </UsersAutocomplete>
+                                    </td>
+                                    <td>
+                                        <label>Дата проведения</label>
+                                    </td>
+                                    <td>
+                                        <LocalizationProvider dateAdapter={AdapterMoment}>
+                                            <DatePicker
+                                                shouldDisableDate={(date: moment.Moment) => {
+                                                    // disable previous days, but allow today
+                                                    const today = moment().toDate();
+                                                    today.setHours(0);
+                                                    today.setMinutes(0);
+                                                    today.setSeconds(0);
+                                                    today.setMilliseconds(0);
 
-                                            const calendarDate = date.toDate();
-                                            calendarDate.setHours(0);
-                                            calendarDate.setMinutes(0);
-                                            calendarDate.setSeconds(0);
-                                            calendarDate.setMilliseconds(0);
+                                                    const calendarDate = date.toDate();
+                                                    calendarDate.setHours(0);
+                                                    calendarDate.setMinutes(0);
+                                                    calendarDate.setSeconds(0);
+                                                    calendarDate.setMilliseconds(0);
 
-                                            return calendarDate < today;
-                                        }}
-                                        value={formState.date}
-                                        onChange={(date: any) => {
-                                            setFormState({ ...formState, date: (date.toDate()) })
-                                        }}
-                                        renderInput={(params) => <TextField {...params} />}
-                                        
-                                    />
-                                </LocalizationProvider>
-                            </td>
-                        </tr>
-                        <tr className="empty"></tr>
-                        <tr>
-                            <td>
-                                <label id="name-label" htmlFor="name-input">Название *</label>
-                            </td>
-                            <td>
-                                <input
-                                    id="city-input"
-                                    type="text"
-                                    value={formState.name}
-                                    onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                                />
-                            </td>
-                        </tr>
-                        <tr className="empty"></tr>
-                        <tr>
-                            <td>
-                                <label id="vk-label" htmlFor="vk-input">Ссылка VK</label>
-                            </td>
-                            <td>
-                                <input
-                                    id="vk-input"
-                                    type="text"
-                                    value={formState.vkLink}
-                                    onChange={(e) => setFormState({ ...formState, vkLink: e.target.value })}
-                                />
-                            </td>
-                            <td>
-                                <label id="city-label" htmlFor="city-input">Город *</label>
-                            </td>
+                                                    return calendarDate < today;
+                                                }}
+                                                value={formState.date}
+                                                onChange={(date: any) => {
+                                                    setFormState({ ...formState, date: (date.toDate()) })
+                                                }}
+                                                renderInput={(params) => <TextField {...params} />}
+                                            />
+                                        </LocalizationProvider>
+                                    </td>
+                                </tr>
+                                <tr className="empty"></tr>
+                                <tr>
+                                    <td>
+                                        <label id="name-label" htmlFor="name-input">Название *</label>
+                                    </td>
+                                    <td>
+                                        <input
+                                            id="city-input"
+                                            type="text"
+                                            value={formState.name}
+                                            onChange={(e) => setFormState({ ...formState, name: e.target.value })}
+                                        />
+                                    </td>
+                                </tr>
+                                <tr className="empty"></tr>
+                                <tr>
+                                    <td>
+                                        <label htmlFor="vk-input">Ссылка VK</label>
+                                    </td>
+                                    <td>
+                                        <input
+                                            id="vk-input"
+                                            type="text"
+                                            value={formState.vkLink}
+                                            onChange={(e) => setFormState({ ...formState, vkLink: e.target.value })}
+                                        />
+                                    </td>
+                                    <td>
+                                        <label htmlFor="city-input">Город *</label>
+                                    </td>
 
-                            <td>
-                                <input
-                                    id="city-input"
-                                    type="text"
-                                    value='Казань'
-                                    disabled
-                                    onChange={(e) => setFormState({ ...formState, city: e.target.value })}
-                                />
-                            </td>
-                        </tr>
-                        <tr className="empty"></tr>
-                    </tbody>
-                </table>
+                                    <td>
+                                        <input
+                                            id="city-input"
+                                            type="text"
+                                            value='Казань'
+                                            disabled
+                                            onChange={(e) => setFormState({ ...formState, city: e.target.value })}
+                                        />
+                                    </td>
+                                </tr>
+                                <tr className="empty"></tr>
+                            </tbody>
+                        </table>
 
-                <div className="events-container">
-                    <div className="events-label">Дисциплины</div>
-                    <div className="events-list">
-                        <div className="event">
-                            <div className="event-name">
-                                3x3
-                            </div>
-                            <div className="event-rounds">
-                                раунды ({formState.rounds.length})
+                        <div className="events-container">
+                            <div className="events-label">Дисциплины</div>
+                            <div className="events-list">
+                                <div className="event">
+                                    <div className="event-name">
+                                        3x3
+                                    </div>
+                                    <div className="event-rounds">
+                                        раунды ({formState.rounds.length})
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <div className="rounds-header">
-                    <div className="add-round-btn">
-                        Раунды 3х3
-                    </div>
-                    <div>
-                        <button className="round-btn" onClick={addNewRound} disabled={formState.rounds.length === 3}>
-                            +
-                        </button>
-                    </div>
-                    <div>
-                        <button className="round-btn" onClick={removeRound} disabled={formState.rounds.length === 1}>
-                            -
-                        </button>
-                    </div>
-                </div>
+                        <div className="rounds-header">
+                            <div className="add-round-btn">
+                                Раунды 3х3
+                            </div>
+                            <div>
+                                <button className="round-btn" onClick={addNewRound} disabled={formState.rounds.length === 3}>
+                                    +
+                                </button>
+                            </div>
+                            <div>
+                                <button className="round-btn" onClick={removeRound} disabled={formState.rounds.length === 1}>
+                                    -
+                                </button>
+                            </div>
+                        </div>
 
-                <table className="rounds-table">
-                    <tbody>
-                        <tr className="empty"></tr>
-                        {roundItems}
-                    </tbody>
-                </table>
+                        <table className="rounds-table">
+                            <tbody>
+                                <tr className="empty"></tr>
+                                {roundItems}
+                            </tbody>
+                        </table>
 
-                <div className="actions-container">
-                    <FormButton onClick={() => { navigate(`../contests${search}`); }} disabled={false} text="Назад к списку"></FormButton>
-                    <FormButton onClick={async () => { await handleSubmit(); }} disabled={!isFormValid()} text="Сохранить"></FormButton>
-                </div>
-            </div>
+                        <div className="actions-container">
+                            <FormButton onClick={() => { navigate(`../contests${search}`); }} disabled={false} text="Назад к списку"></FormButton>
+                            <FormButton onClick={async () => { await onSubmitButtonClick(); }} disabled={!isFormValid()} text="Сохранить"></FormButton>
+                        </div>
+                    </div>
+                </>
+            }
         </>
     );
 }

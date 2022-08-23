@@ -63,7 +63,6 @@ export const USER_OPTIONS_LOADING_VALUE = -2;
 export const USER_OPTIONS_INVALID_INPUT_VALUE = -3;
 
 export class UserOption {
-
     constructor(
         public userId: number,
         public disabled: boolean, 

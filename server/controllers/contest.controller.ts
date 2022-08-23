@@ -1,7 +1,6 @@
 import { ContestStatus, Round } from "@prisma/client";
 import { prisma } from "..";
 
-// TODO handle exceptions, change return type to 500
 export const getAllContests = async (req: any, res: any) => {
     try {
         const contests = await prisma.contest.findMany({
@@ -13,12 +12,14 @@ export const getAllContests = async (req: any, res: any) => {
         res.status(200).json(contests);
     }
     catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }   
 };
 
 export const createContest = async (req: any, res: any) => {
     try {
+    throw new Error('gail')
+
         const date = new Date(req.body.date);
         date.setHours(0, 0, 0, 0);
 
@@ -40,7 +41,7 @@ export const createContest = async (req: any, res: any) => {
         res.status(201).json(createdContest);
     }
     catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }   
 };
 
@@ -57,10 +58,11 @@ export const deleteContest = async (req: any, res: any) => {
         res.status(200).json(deletedContest);
     }
     catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }   
 };
 
+// TODO check if loading results is really needed
 export const getContest = async (req: any, res: any) => {
     try {
         var id = +req.params.id;
@@ -82,10 +84,15 @@ export const getContest = async (req: any, res: any) => {
             }
         });
 
+        if (!contest) {
+            res.status(204).json();
+            return;
+        }
+
         res.status(200).json(contest);
     }
     catch (error: any) {
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }   
 };
 
@@ -127,7 +134,7 @@ export const updateContest = async (req: any, res: any) => {
     catch (error: any) {
         console.log(error);
         
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }   
 };
 
@@ -148,6 +155,6 @@ export const publishContest = async (req: any, res: any) => {
     catch (error: any) {
         console.log(error);
         
-        res.status(404).json({ message: error.message });
+        res.status(500).json({ message: error.message });
     }
 }

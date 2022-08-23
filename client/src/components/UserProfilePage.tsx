@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Result, User } from "../models/state";
+import { HttpResponseStatusCode } from "../enums";
+import { ErrorHandlerProps, Result, User } from "../models/state";
+import { handleResponses } from "../services/http-response.service";
 import { toDelimitedString } from "../services/results-service";
+import Loading from "./shared/Loading";
+import UserNotFound from "./shared/UserNotFound";
 import './UserProfilePage.scss';
 
 type UserProfilePageState = {
@@ -17,9 +21,17 @@ type ProfileResult = Result & {
     roundName: string,
 };
 
+enum UserProfilePageStatus {
+    Idle,
+    Loading,
+    Loaded,
+    UserNotFound,
+    Error,
+}
+
 // TODO add records tab
 // TODO add place in round value
-const UserProfilePage = () => {
+const UserProfilePage = (props: ErrorHandlerProps) => {
     const navigate = useNavigate();
     const { id: userId } = useParams();
     const [ state, setState ] = useState<UserProfilePageState>({
@@ -28,16 +40,25 @@ const UserProfilePage = () => {
         solvesCount: 0,
         allResults: [],
     });
+    const [ status, setStatus ] = useState<UserProfilePageStatus>(UserProfilePageStatus.Idle);
+    const addNotification = props.addNotification;
 
     useEffect(() => {
         const baseUrl = `${process.env.REACT_APP_BACKEND_SERVER_URL}/users`;
 
-        const getUser = fetch(`${baseUrl}/${userId}/profile`).then(res => res.json());
-        const getContestsCount = fetch(`${baseUrl}/${userId}/contests-count`).then(res => res.json());
-        const getAllResults = fetch(`${baseUrl}/${userId}/all-results`).then(res => res.json());
+        const getUser = fetch(`${baseUrl}/${userId}/profile`);
+        const getContestsCount = fetch(`${baseUrl}/${userId}/contests-count`);
+        const getAllResults = fetch(`${baseUrl}/${userId}/all-results`);
 
-        Promise.all([  getUser, getContestsCount, getAllResults ])
-            .then((res: [ User, number, { allResults: any[], totalSolvesCount: number }]) => {
+        setStatus(UserProfilePageStatus.Loading);
+
+        Promise.all([ getUser, getContestsCount, getAllResults ])
+            .then(responses => {
+                handleResponses(responses);
+
+                return Promise.all(responses.map(r => r.json()));
+            })
+            .then((res) => {
                 const user = res[0];
                 const contestsCount = res[1];
                 const allResultsInfo = res[2];
@@ -49,15 +70,30 @@ const UserProfilePage = () => {
                         solvesCount: allResultsInfo.totalSolvesCount,
                         allResults: allResultsInfo.allResults,
                     };
-                })
-            });
+                });
+                setStatus(UserProfilePageStatus.Loaded);
+            })
+            .catch((err) => {
+                if (err.message === HttpResponseStatusCode.NoContent.toString()) {
+                    // do not show notification for empty response
+                    setStatus(UserProfilePageStatus.UserNotFound);
+                    return;
+                }
+
+                setStatus(UserProfilePageStatus.Error);
+                addNotification({ message: 'Произошла ошибка при загрузке пользователя. Повторите попытку позже.' });
+            })
     }, [userId]);
 
     const onContestClick = (contestId: number) => {
         navigate(`../contests/${contestId}/results`);
     }
 
-    if (!state.user) return <div>Пользователь не найден!</div>;
+    if (status === UserProfilePageStatus.Loading) return <Loading></Loading>;
+
+    // check for contest to get rid of '?' sign in the main markup
+    if (!state.user || [UserProfilePageStatus.Error, UserProfilePageStatus.UserNotFound].find(s => s === status)) 
+        return <UserNotFound></UserNotFound>
 
     return (
         <div className="user-profile-page">

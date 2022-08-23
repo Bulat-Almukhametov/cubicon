@@ -7,7 +7,6 @@ type ButtonProps = {
 }
 
 const FormButton = (props: ButtonProps) => {
-
     return (
         <button className='form-button' disabled={props.disabled} onClick={props.onClick}>{props.text}</button>
     )
