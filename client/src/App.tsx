@@ -1,5 +1,5 @@
 import "./App.scss";
-import { BrowserRouter, Routes, Route, Navigate, NavLink, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, NavLink, useLocation } from "react-router-dom";
 import EditContestForm from "./components/EditContestForm";
 import ContestsList from "./components/ContestsList";
 import EditResults from "./components/EditResults";
