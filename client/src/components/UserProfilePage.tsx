@@ -83,7 +83,7 @@ const UserProfilePage = (props: ErrorHandlerProps) => {
                 setStatus(UserProfilePageStatus.Error);
                 addNotification({ message: 'Произошла ошибка при загрузке пользователя. Повторите попытку позже.' });
             })
-    }, [userId]);
+    }, [userId, addNotification]);
 
     const onContestClick = (contestId: number) => {
         navigate(`../contests/${contestId}/results`);
