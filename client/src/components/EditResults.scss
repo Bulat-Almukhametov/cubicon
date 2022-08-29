@@ -36,6 +36,7 @@
 
 .results-container {
     overflow: auto;
+    min-width: 800px;
     padding: 20px 30px 40px;
     background-color: $secondary;
     border-bottom-left-radius: 8px;

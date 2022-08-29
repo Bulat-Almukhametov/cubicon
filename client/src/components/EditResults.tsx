@@ -118,6 +118,8 @@ const EditResults = (props: ResultsComponentProps) => {
             headers: {'Content-Type': 'application/json'},
         });
 
+        setStatus(EditResultsPageStatus.Loading);
+
         // TODO error handling
         Promise.all([ getContest, getUsers ])
             .then(responses => {
@@ -642,10 +644,10 @@ const EditResults = (props: ResultsComponentProps) => {
                 <table className='results-table'>
                     <thead>
                         <tr>
-                            <th style={{width: '45px'}}>Место</th>
-                            <th style={{width: '220px'}}>Участник</th>
-                            <th style={{width: '120px'}}>Лучшая</th>
-                            <th style={{width: '120px'}}>Среднее</th>
+                            <th>Место</th>
+                            <th style={{width: '30%'}}>Участник</th>
+                            <th>Лучшая</th>
+                            <th>Среднее</th>
                             <th colSpan={5} style={{width: '370px'}}>Сборки</th>
                             { isEditingMode && <th colSpan={2} style={{width: '100px'}}></th>}
                         </tr>

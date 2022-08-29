@@ -18,8 +18,6 @@ export const getAllContests = async (req: any, res: any) => {
 
 export const createContest = async (req: any, res: any) => {
     try {
-    throw new Error('gail')
-
         const date = new Date(req.body.date);
         date.setHours(0, 0, 0, 0);
 

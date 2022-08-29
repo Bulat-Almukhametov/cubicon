@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import contests from './routes/contest';
 import rounds from './routes/round';
 import results from './routes/result';
+import cities from './routes/city';
 import { PrismaClient } from '@prisma/client';
 import cors from 'cors';
 import userRoutes from './routes/user.routes';
@@ -27,5 +28,6 @@ app.use('/users', userRoutes);
 app.use('/contests', contests);
 app.use('/rounds', rounds);
 app.use('/results', results);
+app.use('/cities', cities);
 
 app.listen(PORT, () => console.log(`Running on ${PORT} ⚡`));
