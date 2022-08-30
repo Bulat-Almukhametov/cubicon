@@ -1,0 +1,19 @@
+# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and deploy it to a remote server
+name:  Deploy Cubicon Dev
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  Test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Check env file
+      env:
+        REACT_APP_BACKEND_SERVER_URL: ${{ secrets.REACT_APP_BACKEND_SERVER_URL }}
+      run: echo ${{ env.REACT_APP_BACKEND_SERVER_URL }}
