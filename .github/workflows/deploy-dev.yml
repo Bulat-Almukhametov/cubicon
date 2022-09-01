@@ -47,7 +47,9 @@ jobs:
         USERNAME: ${{ secrets.SSH_USER }}
         PORT: ${{ secrets.SSH_PORT }}
         KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: cd ../cubicon-staging/server && ls
+        script: |
+          whoami
+          ls -al
 
   BuildClient:
     runs-on: ubuntu-latest
