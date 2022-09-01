@@ -40,6 +40,15 @@ jobs:
     - name: Deploy with rsync
       run: rsync -avz ./server/dist/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/cubicon-staging/server/dist
 
+    - name: Executing remote command
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        USERNAME: ${{ secrets.SSH_USER }}
+        PORT: ${{ secrets.SSH_PORT }}
+        KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: cd ../cubicon-staging/server && ls
+
   BuildClient:
     runs-on: ubuntu-latest
     environment: dev
@@ -74,12 +83,3 @@ jobs:
 
     - name: Deploy with rsync
       run: rsync -avz ./client/build/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/var/www/cubicon-staging/client
-
-    - name: Executing remote command
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        USERNAME: ${{ secrets.SSH_USER }}
-        PORT: ${{ secrets.PORT }}
-        KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: ls
