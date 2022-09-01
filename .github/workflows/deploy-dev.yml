@@ -44,12 +44,13 @@ jobs:
       uses: appleboy/ssh-action@dce9d565de8d876c11d93fa4fe677c0285a66d78
       with:
         host: ${{ secrets.SSH_HOST }}
-        USERNAME: ${{ secrets.SSH_USER }}
-        PORT: ${{ secrets.SSH_PORT }}
-        KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        username: ${{ secrets.SSH_USER }}
+        port: ${{ secrets.SSH_PORT }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script_stop: true
         script: |
-          whoami
-          ls -al
+          cd ../cubicon-staging/server
+          npx prisma migrate deploy
 
   BuildClient:
     runs-on: ubuntu-latest
