@@ -60,7 +60,7 @@ const App = () => {
                                     isEditingMode={false}/>}
                             ></Route>
                             <Route path="/users/:id" element={<UserProfilePage addNotification={addNotification}/>}></Route>
-                            <Route path="/" element={<Navigate to="/contests?showUpcoming=true" />}></Route>
+                            <Route path="/" element={<Navigate to="/contests" />}></Route>
                         </Routes>
                     </div>
                 </div>
