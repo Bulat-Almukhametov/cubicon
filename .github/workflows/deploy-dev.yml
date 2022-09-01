@@ -41,7 +41,7 @@ jobs:
       run: rsync -avz ./server/dist/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/cubicon-staging/server/dist
 
     - name: Copy migration files using Rsync
-      run: rsync -avz ./prisma/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/cubicon-staging/server/prisma
+      run: rsync -avz ./server/prisma/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/cubicon-staging/server/prisma
 
     - name: Executing remote command
       uses: appleboy/ssh-action@dce9d565de8d876c11d93fa4fe677c0285a66d78
