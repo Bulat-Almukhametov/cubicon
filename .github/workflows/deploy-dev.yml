@@ -43,7 +43,7 @@ jobs:
     - name: Copy migration files using Rsync
       run: rsync -avz ./server/prisma/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/cubicon-staging/server/prisma
 
-    - name: Executing remote command
+    - name: Apply pending migrations and regenerate Prisma client
       uses: appleboy/ssh-action@dce9d565de8d876c11d93fa4fe677c0285a66d78
       with:
         host: ${{ secrets.SSH_HOST }}
@@ -54,6 +54,7 @@ jobs:
         script: |
           cd ../cubicon-staging/server
           npx prisma migrate deploy
+          npx prisma generate
 
   BuildClient:
     runs-on: ubuntu-latest
