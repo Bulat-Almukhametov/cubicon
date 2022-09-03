@@ -61,3 +61,14 @@ export const createCitiesAndRegions = async (req: any, res: any) => {
         });
     }   
 };
+
+export const getAllCities = async (req: any, res: any) => {
+    try {
+        const cities = await prisma.city.findMany();
+
+        res.status(200).json(cities);
+    }
+    catch (error: any) {
+        res.status(500).json({ message: error.message });
+    }   
+};

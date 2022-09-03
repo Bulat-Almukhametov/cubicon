@@ -1,15 +1,15 @@
-import moment from "moment";
-import { useEffect, useState } from "react";
-import "./EditContestForm.scss";
+import { TextField } from "@mui/material";
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterMoment } from '@mui/x-date-pickers/AdapterMoment';
-import { TextField } from "@mui/material";
-import { ErrorHandlerProps, User, UserOption, RoundFormat } from "../models/state";
+import moment from "moment";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import FormButton from "./shared/FormButton";
-import UsersAutocomplete from "./shared/UsersAutocomplete";
-import ContestNotFound from "./shared/ContestNotFound";
 import { HttpResponseStatusCode } from "../enums";
+import { City, ErrorHandlerProps, RoundFormat, User } from "../models/state";
+import "./EditContestForm.scss";
+import Autocomplete, { AutocompleteOption } from "./shared/Autocomplete";
+import ContestNotFound from "./shared/ContestNotFound";
+import FormButton from "./shared/FormButton";
 import Loading from "./shared/Loading";
 
 type RoundItem = {
@@ -19,12 +19,13 @@ type RoundItem = {
 
 type ContestFormState = {
     name: string,
-    city: string,
     date: Date,
     vkLink: string,
     organizedById: number | null,
+    cityId: number | null,
     rounds: RoundItem[],
-    allUserOptions: UserOption[],
+    allUserOptions: AutocompleteOption[],
+    allCityOptions: AutocompleteOption[],
 }
 
 enum EditContestPageStatus {
@@ -54,15 +55,17 @@ const EditContestForm = (props: ErrorHandlerProps) => {
 
     const [ formState, setFormState ] = useState<ContestFormState>({
         name: '',
-        city: 'Казань',
         date: new Date(),
         vkLink: '',
         organizedById: null,
+        cityId: null,
         rounds: [availableRounds[0]],
         allUserOptions: [],
+        allCityOptions: [],
     });
 
-    const [ selectedUserOption, setSelectedUserOption ] = useState<UserOption | null>(null);
+    const [ selectedUserOption, setSelectedUserOption ] = useState<AutocompleteOption | null>(null);
+    const [ selectedCityOption, setSelectedCityOption ] = useState<AutocompleteOption | null>(null);
     const [ status, setStatus ] = useState<EditContestPageStatus>(EditContestPageStatus.Idle);
     const { addNotification } = props;
 
@@ -88,9 +91,14 @@ const EditContestForm = (props: ErrorHandlerProps) => {
             method: 'GET',
             headers: {'Content-Type': 'application/json'},
         });
+        
+        const getCities = fetch(`${process.env.REACT_APP_BACKEND_SERVER_URL}/cities`, {
+            method: 'GET',
+            headers: {'Content-Type': 'application/json'},
+        });
 
         // TODO refactor - when there are too many users, it will slow down the app. Do not load all users at once
-        Promise.all([getContestInfo, getUsers])
+        Promise.all([getContestInfo, getUsers, getCities])
             .then(responses => {
                 const failedResponse = responses.find(r => r && r.status !== HttpResponseStatusCode.OK && r.status !== HttpResponseStatusCode.NoContent);
                 if (failedResponse)
@@ -101,9 +109,12 @@ const EditContestForm = (props: ErrorHandlerProps) => {
 
                 return Promise.all(responses.map(res => !res ? Promise.resolve(null) : res.json()));
             })
-            .then(([contestInfo, users]) => {
+            .then(([contestInfo, users, cities]) => {
                 const allUserOptions = users.map((u: User) => {
-                    return { displayName: getUserDisplayName(u), userId: u.id, disabled: false };
+                    return new AutocompleteOption(u.id, getUserDisplayName(u), false);
+                });
+                const allCityOptions = cities.map((c: City) => {
+                    return new AutocompleteOption(c.id, c.name);
                 });
 
                 if (isAddNewMode) {
@@ -111,6 +122,7 @@ const EditContestForm = (props: ErrorHandlerProps) => {
                         return {
                             ...state,
                             allUserOptions,
+                            allCityOptions,
                         }
                     });
 
@@ -122,20 +134,21 @@ const EditContestForm = (props: ErrorHandlerProps) => {
                 // populate form with contest data
                 setFormState({
                     name: contestInfo.name,
-                    city: contestInfo.city,
                     date: contestInfo.date,
                     vkLink: contestInfo.vkUrl,
                     organizedById: contestInfo.organizedById,
+                    cityId: contestInfo.cityId,
                     rounds: contestInfo.rounds,
                     allUserOptions,
+                    allCityOptions,
                 });
 
                 // preselect organizer autocomplete with contest data
-                setSelectedUserOption({ 
-                    userId: contestInfo.organizedById, 
-                    disabled: false, 
-                    displayName: getUserDisplayName(users.find((u: User) => u.id === contestInfo.organizedById)),
-                });
+                setSelectedUserOption(new AutocompleteOption(contestInfo.organizedById, getUserDisplayName(users.find((u: User) => u.id === contestInfo.organizedById)), false))
+
+                // preselect city autocomplete with contest data
+                const city = cities.find((c: City) => c.id === contestInfo.cityId);
+                setSelectedCityOption(new AutocompleteOption(city.id, city.name));
 
                 setStatus(EditContestPageStatus.Loaded);
             })
@@ -151,12 +164,12 @@ const EditContestForm = (props: ErrorHandlerProps) => {
             })
     }, [contestIdNum, isAddNewMode, addNotification]);
 
-    const onOrganizerSelect = (userOption: UserOption) => {
+    const onOrganizerSelect = (userOption: AutocompleteOption) => {
         setSelectedUserOption(userOption);
         setFormState(state => {
             return {
                 ...state,
-                organizedById: userOption.userId,
+                organizedById: userOption.id,
             }
         });
     }
@@ -167,6 +180,25 @@ const EditContestForm = (props: ErrorHandlerProps) => {
             return {
                 ...state,
                 organizedById: null,
+            }
+        });
+    }
+    const onCitySelect = (cityOption: any) => {
+        setSelectedCityOption(cityOption);
+        setFormState(state => {
+            return {
+                ...state,
+                cityId: cityOption.id,
+            }
+        });
+    }
+
+    const onCityReset = () => {
+        setSelectedCityOption(null);
+        setFormState(state => {
+            return {
+                ...state,
+                cityId: null,
             }
         });
     }
@@ -182,9 +214,9 @@ const EditContestForm = (props: ErrorHandlerProps) => {
             "name": formState.name,
             "vkUrl": formState.vkLink,
             "date": formState.date,
-            "city": formState.city,
             "rounds": formState.rounds,
             "organizedById": formState.organizedById,
+            "cityId": formState.cityId,
         };
 
         const response = contestIdNum === 0
@@ -201,7 +233,7 @@ const EditContestForm = (props: ErrorHandlerProps) => {
                 body: JSON.stringify(formData),
             });
 
-            navigate('../contests?isAdmin=true');
+            goToContestsList();
 
             // hack to prevent clearing the notifications after url change
             if (!response.ok) {
@@ -232,7 +264,11 @@ const EditContestForm = (props: ErrorHandlerProps) => {
     }
 
     const isFormValid = () => {
-        return !!formState.city && !!formState.name && formState.organizedById !== null;
+        return formState.cityId !== null && !!formState.name && formState.organizedById !== null;
+    }
+
+    const goToContestsList = () => {
+        navigate(`../contests${search}`);
     }
 
     const roundItems = formState.rounds?.map(r => {
@@ -296,13 +332,17 @@ const EditContestForm = (props: ErrorHandlerProps) => {
                                         <label>Организатор *</label>
                                     </td>
                                     <td>
-                                        <UsersAutocomplete 
-                                            allUserOptions={formState.allUserOptions} 
-                                            selectedUserOption={selectedUserOption}
-                                            onUserSelect={onOrganizerSelect}
-                                            onUserReset={onOrganizerReset}
+                                        <Autocomplete 
+                                            allOptions={formState.allUserOptions} 
+                                            selectedOption={selectedUserOption}
+                                            optionsNotFoundDisplayName='Пользователь не найден'
+                                            helperLabelText='Выберите пользователя:'
+                                            placeholderText='Иван Иванов'
+                                            allowCreating={false}
+                                            onOptionSelect={onOrganizerSelect}
+                                            onOptionReset={onOrganizerReset}
                                         >
-                                        </UsersAutocomplete>
+                                        </Autocomplete>
                                     </td>
                                     <td>
                                         <label>Дата проведения</label>
@@ -367,13 +407,17 @@ const EditContestForm = (props: ErrorHandlerProps) => {
                                     </td>
 
                                     <td>
-                                        <input
-                                            id="city-input"
-                                            type="text"
-                                            value='Казань'
-                                            disabled
-                                            onChange={(e) => setFormState({ ...formState, city: e.target.value })}
-                                        />
+                                        <Autocomplete 
+                                            allOptions={formState.allCityOptions} 
+                                            selectedOption={selectedCityOption}
+                                            optionsNotFoundDisplayName='Город не найден'
+                                            helperLabelText="Выберите город"
+                                            placeholderText="Казань"
+                                            allowCreating={false}
+                                            onOptionSelect={onCitySelect}
+                                            onOptionReset={onCityReset}
+                                        >
+                                        </Autocomplete>
                                     </td>
                                 </tr>
                                 <tr className="empty"></tr>
@@ -418,7 +462,7 @@ const EditContestForm = (props: ErrorHandlerProps) => {
                         </table>
 
                         <div className="actions-container">
-                            <FormButton onClick={() => { navigate(`../contests${search}`); }} disabled={false} text="Назад к списку"></FormButton>
+                            <FormButton onClick={goToContestsList} disabled={false} text="Назад к списку"></FormButton>
                             <FormButton onClick={async () => { await onSubmitButtonClick(); }} disabled={!isFormValid()} text="Сохранить"></FormButton>
                         </div>
                     </div>

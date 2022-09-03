@@ -15,6 +15,8 @@ model User {
     email                String? @unique
     firstName            String
     lastName             String
+    cityId               Int
+    city                 City    @relation(fields: [cityId], references: [id])
     organizedContests    Contest[]
     results              Result[]
 
@@ -26,8 +28,9 @@ model Contest {
     name          String        @unique
     date          DateTime
     vkUrl         String?
-    city          String?
     status        ContestStatus @default(NEW)
+    cityId        Int
+    city          City          @relation(fields: [cityId], references: [id])
     organizedById Int?
     organizedBy   User?         @relation(fields: [organizedById], references: [id])
     rounds        Round[]
@@ -44,8 +47,8 @@ model Round {
     name      String
     contestId Int
     contest   Contest   @relation(fields: [contestId], references: [id], onDelete: Cascade)
-    results   Result[]
     format    RoundFormat @default(AVERAGE_OF_5)
+    results   Result[]
 }
 
 enum RoundFormat {
@@ -79,6 +82,8 @@ model City {
     name     String
     regionId Int
     region   Region @relation(fields: [regionId], references: [id], onDelete: Cascade)
+    contests Contest[]
+    users    User[]
 
     @@unique([name, regionId])
 }

@@ -86,6 +86,15 @@ export const getUser = async (req: any, res: any) => {
         const user = await prisma.user.findFirst({
             where: {
                 id: userId,
+            },
+            select: {
+                firstName: true,
+                lastName: true,
+                city: {
+                    select: {
+                        name: true,
+                    },
+                },
             }
         });
 

@@ -1,4 +1,4 @@
-import { ContestStatus, Result, User } from "@prisma/client";
+import { Contest, ContestStatus, Result, User } from "@prisma/client";
 import { prisma } from "..";
 
 const DNF = -1;
@@ -65,8 +65,20 @@ export const updateResults = async (req: any, res: any) => {
             }
         }
 
-        // validate and update contest
-        const validationErrorMessage = await validateContest(contestId);
+        // validate contest 
+        const contest = await prisma.contest.findFirst({
+            where: {
+                id: contestId,
+            }
+        });
+    
+        let validationErrorMessage = null;
+        if (contest === null) {
+            validationErrorMessage = `contest with id ${contestId} was not found!`;
+        } else if (contest.status === ContestStatus.PUBLISHED) {
+            validationErrorMessage = `you cannot edit a published contest!`;
+        }
+
         if (validationErrorMessage) {
             res.status(400).json({ message: validationErrorMessage });
 
@@ -91,7 +103,8 @@ export const updateResults = async (req: any, res: any) => {
             }
         })
 
-        const createdUsers = await createNewUsers(results);
+        // contest is not null, since we checked that earlier
+        const createdUsers = await createNewUsers(results, (contest as Contest).cityId);
 
         const creationResult = await prisma.result.createMany({
             data: results.map(r => {
@@ -171,11 +184,12 @@ const isAttemptValid = (attemptValueMs: number) => {
     return attemptValueMs > 0;
 }
 
-const createNewUsers = async (results: ResultUIItem[]) => {
+const createNewUsers = async (results: ResultUIItem[], cityId: number) => {
     const usersToBeCreated = results.filter(r => !r.performedBy.id).map(r => {
         return {
             firstName: r.performedBy.firstName,
             lastName: r.performedBy.lastName,
+            cityId,
         }
     });
     
@@ -205,20 +219,4 @@ const calculateAvg = (attempts: number[]) => {
     const withoutBestAndWorst: number[] = withoutBest.filter((_, i) => i !== withoutBest.indexOf(worst));
 
     return Math.floor(withoutBestAndWorst.reduce((prev, cur) => prev + cur, 0) / 3);
-}
-
-const validateContest = async (contestId: number) => {
-    const contest = await prisma.contest.findFirst({
-        where: {
-            id: contestId,
-        }
-    });
-
-    if (contest === null) {
-        return `contest with id ${contestId} was not found!`;
-    }
-
-    if (contest.status === ContestStatus.PUBLISHED) {
-        return `you cannot edit a published contest!`;
-    }
 }

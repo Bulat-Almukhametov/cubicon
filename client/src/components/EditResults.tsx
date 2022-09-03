@@ -7,15 +7,18 @@ import ErrorIcon from '@mui/icons-material/Error';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DNF, DNF_DISPLAY_VALUE, DNS, DNS_DISPLAY_VALUE } from '../constants';
-import { Contest, ErrorHandlerProps, User, UserOption } from '../models/state';
-import { getBestAndAverage, toDelimitedString, toMilliseconds } from '../services/results-service';
-import './EditResults.scss';
-import FormButton from './shared/FormButton';
-import ContestNotFound from './shared/ContestNotFound';
-import UsersAutocomplete from './shared/UsersAutocomplete';
-import Loading from './shared/Loading';
 import { HttpResponseStatusCode } from '../enums';
+import { Contest, ErrorHandlerProps, User } from '../models/state';
 import { handleResponses } from '../services/http-response.service';
+import { getBestAndAverage, toDelimitedString, toMilliseconds } from '../services/results.helper';
+import { getDisplayName, getUserFirstName, getUserLastName, isUserInputValueValid } from '../services/users.helper';
+import './EditResults.scss';
+import Autocomplete, { AutocompleteOption } from './shared/Autocomplete';
+import ContestNotFound from './shared/ContestNotFound';
+import FormButton from './shared/FormButton';
+import Loading from './shared/Loading';
+
+export type UserUIItem = Omit<User, 'city' | 'cityId'>;
 
 // TODO use this model for input row only. The values should not be null for the results
 type ResultUIItem = {
@@ -27,7 +30,7 @@ type ResultUIItem = {
     attempt5: string | null,
     best: string | null,
     average: string | null,
-    performedBy: User | null,
+    performedBy: UserUIItem | null,
     roundId: number,
 
     // indicates that the result is being edited
@@ -92,12 +95,13 @@ const EditResults = (props: ResultsComponentProps) => {
         contestResults: [],
         editingResult: defaultEditingResult,
     });
-    const [ selectedUserOption, setSelectedUserOption ] = useState<UserOption | null>(null);
-    const [ allUserOptions, setAllUserOptions ] = useState<UserOption[]>([]);
+    const [ selectedUserOption, setSelectedUserOption ] = useState<AutocompleteOption | null>(null);
+    const [ allUserOptions, setAllUserOptions ] = useState<AutocompleteOption[]>([]);
     const [ status, setStatus ] = useState<EditResultsPageStatus>(EditResultsPageStatus.Idle);
 
     const addNotification = props.addNotification;
-
+    const createNewUserText = 'Создать участника: ';
+    
     useEffect(() => {
         const contestIdNum = Number(contestId);
 
@@ -130,7 +134,7 @@ const EditResults = (props: ResultsComponentProps) => {
             .then(([contest, users]) => {
                 // TODO find a way to preserve return types
                 setAllUserOptions(users.map((u: User) => {
-                    return new UserOption(u.id, false, u.firstName, u.lastName);
+                    return new AutocompleteOption(u.id, getDisplayName(u));
                 }));
 
                 const contestResults = (contest as Contest).rounds.flatMap(round => round.results).map(r => {
@@ -143,7 +147,11 @@ const EditResults = (props: ResultsComponentProps) => {
                         attempt5: toDelimitedString(r.attempt5),
                         best: toDelimitedString(r.best),
                         average: toDelimitedString(r.average),
-                        performedBy: r.performedBy,
+                        performedBy: {
+                            id: r.performedBy.id,
+                            firstName: r.performedBy.firstName,
+                            lastName: r.performedBy.lastName,
+                        },
                         roundId: r.roundId,
                     } as ResultUIItem;
 
@@ -197,7 +205,7 @@ const EditResults = (props: ResultsComponentProps) => {
             };
         });
 
-        const userOption = allUserOptions.find(uo => uo.firstName === result.performedBy?.firstName && uo.lastName === result.performedBy?.lastName);
+        const userOption = allUserOptions.find(uo => result.performedBy && uo.displayName === getDisplayName(result.performedBy));
 
         if (!userOption)
             return;
@@ -259,7 +267,7 @@ const EditResults = (props: ResultsComponentProps) => {
         setSelectedUserOption(null);
     }
 
-    const onResultSaveClick = () => {        
+    const onResultSaveClick = () => {  
         setState(state => {
             return {
                 ...state,
@@ -314,16 +322,22 @@ const EditResults = (props: ResultsComponentProps) => {
         });
     }        
 
-    const onCompetitorSelect = (userOption: UserOption) => {
-        setSelectedUserOption(userOption);
+    const onCompetitorSelect = (selectedOption: AutocompleteOption) => {
+        if (!selectedOption) return;
 
-        // TODO probably all 3 state updates can be done using only one entry, e.g - userOption.selected
+        // remove add entity text after selection
+        if (selectedOption.displayName.includes(createNewUserText))
+            selectedOption.displayName = selectedOption.displayName.split(createNewUserText)[1];
+
+        setSelectedUserOption(selectedOption);
+
+        // TODO probably all 3 state updates can be done using only one entry, e.g - selectedOption.selected
         // add a new user to the dropdown options so he can be selected in other rounds
-        if (!allUserOptions.find(uo => uo.firstName === userOption.firstName && uo.lastName === userOption.lastName)) {
-            userOption.manuallyCreated = true;
+        if (!allUserOptions.find(uo => uo.displayName === selectedOption.displayName)) {
+            selectedOption.isManuallyCreated = true;
 
             setAllUserOptions(userOptions => {
-                return [ ...userOptions, userOption ];
+                return [ ...userOptions, selectedOption ];
             });
         }
 
@@ -331,7 +345,7 @@ const EditResults = (props: ResultsComponentProps) => {
             if (!r.performedBy) 
                 return false;
 
-            return r.performedBy.firstName === userOption.firstName && r.performedBy.lastName === userOption.lastName;
+            return selectedOption.displayName === getDisplayName(r.performedBy);
         });
 
         if (!!existingResultForCompetitor) {
@@ -341,9 +355,9 @@ const EditResults = (props: ResultsComponentProps) => {
         }
 
         const performedBy = {
-            id: userOption.userId,
-            firstName: userOption.firstName ?? '',
-            lastName: userOption.lastName ?? '',
+            id: selectedOption.id,
+            firstName: getUserFirstName(selectedOption),
+            lastName: getUserLastName(selectedOption),
         }
 
         setState(state => {
@@ -480,7 +494,7 @@ const EditResults = (props: ResultsComponentProps) => {
         .sort((a, b) => sortResults(a, b));
 
     const editingResult = state.editingResult;
-
+    
     // TODO add validation messages to the user
     const isEditingResultValid = [
         editingResult.attempt1, 
@@ -499,7 +513,7 @@ const EditResults = (props: ResultsComponentProps) => {
         return state.contestResults.some(r => r.roundId === roundId);
     }
 
-    const isTheSameUser = (user1: User | null, user2: User | null) => {
+    const isTheSameUser = (user1: UserUIItem | null, user2: UserUIItem | null) => {
         if (!user1 || !user2) return false;
 
         return user1.id === user2.id && user1.firstName === user2.firstName && user1.lastName === user2.lastName;
@@ -529,13 +543,20 @@ const EditResults = (props: ResultsComponentProps) => {
         <>
             <td></td>
             <td>
-                <UsersAutocomplete 
-                    allUserOptions={allUserOptions} 
-                    selectedUserOption={selectedUserOption}
-                    onUserSelect={onCompetitorSelect}
-                    onUserReset={onCompetitorReset}
+                <Autocomplete 
+                    allOptions={allUserOptions} 
+                    selectedOption={selectedUserOption}
+                    optionsNotFoundDisplayName='Пользователь не найден'
+                    helperLabelText='Выберите пользователя:'
+                    placeholderText='Иван Иванов'
+                    allowCreating={true}
+                    addNewEntityOptionDisplayName={createNewUserText}
+                    nameFormatText={'Введите имя в формате "Иван Иванов"'}
+                    isInputValueValid={isUserInputValueValid}
+                    onOptionSelect={onCompetitorSelect}
+                    onOptionReset={onCompetitorReset}
                 >
-                </UsersAutocomplete>
+                </Autocomplete>
             </td>
             <td></td>
             <td></td>
@@ -660,8 +681,9 @@ const EditResults = (props: ResultsComponentProps) => {
                                     <td className='td-order'>{++i}</td>
                                     <td className='td-name' onClick={() => onUserClick(r.performedBy?.id ?? null)}>
                                         <p className='user-name'>
-                                            { allUserOptions.find(uo => uo.userId === r.performedBy?.id &&
-                                                uo.firstName === r.performedBy?.firstName && uo.lastName === r.performedBy?.lastName)?.displayName ?? '' }
+                                            {
+                                                r.performedBy && getDisplayName(r.performedBy)
+                                            }
                                         </p>
                                     </td>
                                     <td className='td-res'>{r.best}</td>

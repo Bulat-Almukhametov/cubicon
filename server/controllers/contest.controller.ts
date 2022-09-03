@@ -5,7 +5,8 @@ export const getAllContests = async (req: any, res: any) => {
     try {
         const contests = await prisma.contest.findMany({
             include: {
-                organizedBy: true
+                organizedBy: true,
+                city: true,
             }
         });
 
@@ -25,7 +26,7 @@ export const createContest = async (req: any, res: any) => {
             data: {
                 name: req.body.name,
                 vkUrl: req.body.vkUrl,
-                city: req.body.city,
+                city: { connect: { id: req.body.cityId } },
                 date,
                 organizedBy: { connect: { id: req.body.organizedById } },
                 rounds: { create: req.body.rounds },

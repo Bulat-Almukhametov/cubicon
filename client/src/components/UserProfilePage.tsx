@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { HttpResponseStatusCode } from "../enums";
 import { ErrorHandlerProps, Result, User } from "../models/state";
 import { handleResponses } from "../services/http-response.service";
-import { toDelimitedString } from "../services/results-service";
+import { toDelimitedString } from "../services/results.helper";
 import Loading from "./shared/Loading";
 import UserNotFound from "./shared/UserNotFound";
 import './UserProfilePage.scss';
@@ -107,7 +107,7 @@ const UserProfilePage = (props: ErrorHandlerProps) => {
                         <h3>
                             Город
                         </h3>
-                        <div className="info-text">Казань</div>
+                        <div className="info-text">{state.user.city.name}</div>
                     </div>
 
                     <div className="info-item">
