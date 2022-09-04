@@ -10,8 +10,8 @@
 /*
  There is no default value for cityId column, so delete all records:
 */
-DELETE FROM 'User';
-DELETE FROM 'Contest';
+DELETE FROM `User`;
+DELETE FROM `Contest`;
 
 -- AlterTable
 ALTER TABLE `Contest` DROP COLUMN `city`,
