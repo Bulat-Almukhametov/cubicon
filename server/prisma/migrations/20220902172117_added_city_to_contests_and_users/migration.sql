@@ -10,6 +10,7 @@
 /*
  There is no default value for cityId column, so delete all records:
 */
+DELETE FROM `Result`;
 DELETE FROM `User`;
 DELETE FROM `Contest`;
 
