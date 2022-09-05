@@ -1,6 +1,6 @@
 import { DNF, DNF_DISPLAY_VALUE, DNS, DNS_DISPLAY_VALUE } from "../constants";
 
-// transfors the input attempt in milliseconds to a readable format 'MM:SS.ms'
+// transforms the input attempt in milliseconds to a readable format 'MM:SS.ms'
 export const toDelimitedString = (resultMs: number) => {
     if (resultMs === DNF) return DNF_DISPLAY_VALUE;
     if (resultMs === DNS) return DNS_DISPLAY_VALUE;

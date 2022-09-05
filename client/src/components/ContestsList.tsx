@@ -211,7 +211,7 @@ const ContestList = (props: ErrorHandlerProps) => {
             <>
                 <p>{c.name}</p>
                 <p>{getReadableDate(new Date(c.date))}</p>
-                {c.city ? <p>{c.city}</p> : null}
+                <p>{c.city.name}</p>
                 {c.organizedBy ? <p>{c.organizedBy.firstName + ' ' + c.organizedBy.lastName}</p> : null}
             </>
         );

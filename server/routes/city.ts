@@ -1,8 +1,9 @@
 import express from 'express';
-import { createCitiesAndRegions } from '../controllers/city.controller';
+import { createCitiesAndRegions, getAllCities } from '../controllers/city.controller';
 
 const router = express.Router();
 
+router.get('/', getAllCities);
 router.get('/createCitiesAndRegions', createCitiesAndRegions);
 
 export default router;
