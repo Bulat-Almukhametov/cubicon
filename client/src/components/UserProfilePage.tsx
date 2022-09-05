@@ -97,7 +97,7 @@ const UserProfilePage = (props: ErrorHandlerProps) => {
 
     return (
         <div className="user-profile-page">
-            <div className="container main-info">
+            <div className="container main-info full-width-scrollable-container">
                 <h2>
                     { `${state.user.firstName} ${state.user.lastName}`}
                 </h2>
@@ -126,7 +126,7 @@ const UserProfilePage = (props: ErrorHandlerProps) => {
                 </div>
             </div>
 
-            <div className="container results-info">
+            <div className="container results-info full-width-scrollable-container">
                 <h3>Все результаты</h3>
 
                 <table className="results-table">

@@ -64,7 +64,11 @@ export const createCitiesAndRegions = async (req: any, res: any) => {
 
 export const getAllCities = async (req: any, res: any) => {
     try {
-        const cities = await prisma.city.findMany();
+        const cities = await prisma.city.findMany({
+            include: {
+                region: true,
+            }
+        });
 
         res.status(200).json(cities);
     }

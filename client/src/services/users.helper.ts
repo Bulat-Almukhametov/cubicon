@@ -2,7 +2,7 @@ import { UserUIItem } from "../components/EditResults"
 import { AutocompleteOption } from "../components/shared/Autocomplete"
 import { User } from "../models/state"
 
-export const getDisplayName = (user: User | UserUIItem) => {
+export const getUserDisplayName = (user: User | UserUIItem) => {
     return `${user.firstName} ${user.lastName}`
 }
 

@@ -51,7 +51,9 @@ const Autocomplete = (props: AutocompleteProps) => {
                 if (inputValue.length < AUTOCOMPLETE_MIN_SYMBOLS) 
                     return [ new AutocompleteOption(AUTOCOMPLETE_OPTION_NO_VALUE, AUTOCOMPLETE_OPTION_MIN_SYMBOLS_DISPLAY_NAME, true) ];
 
-                const filtered = filterCities(allOptions, params);
+                const filtered = filterCities(allOptions, params).sort((prev, next) => {
+                    return prev.displayName.toLowerCase().indexOf(inputValue) > next.displayName.toLowerCase().indexOf(inputValue) ? 1 : -1;
+                });
 
                 if (!filtered.length) {
                     if (allowCreating) {

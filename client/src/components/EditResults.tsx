@@ -11,7 +11,7 @@ import { HttpResponseStatusCode } from '../enums';
 import { Contest, ErrorHandlerProps, User } from '../models/state';
 import { handleResponses } from '../services/http-response.service';
 import { getBestAndAverage, toDelimitedString, toMilliseconds } from '../services/results.helper';
-import { getDisplayName, getUserFirstName, getUserLastName, isUserInputValueValid } from '../services/users.helper';
+import { getUserDisplayName, getUserFirstName, getUserLastName, isUserInputValueValid } from '../services/users.helper';
 import './EditResults.scss';
 import Autocomplete, { AutocompleteOption } from './shared/Autocomplete';
 import ContestNotFound from './shared/ContestNotFound';
@@ -134,7 +134,7 @@ const EditResults = (props: ResultsComponentProps) => {
             .then(([contest, users]) => {
                 // TODO find a way to preserve return types
                 setAllUserOptions(users.map((u: User) => {
-                    return new AutocompleteOption(u.id, getDisplayName(u));
+                    return new AutocompleteOption(u.id, getUserDisplayName(u));
                 }));
 
                 const contestResults = (contest as Contest).rounds.flatMap(round => round.results).map(r => {
@@ -205,7 +205,7 @@ const EditResults = (props: ResultsComponentProps) => {
             };
         });
 
-        const userOption = allUserOptions.find(uo => result.performedBy && uo.displayName === getDisplayName(result.performedBy));
+        const userOption = allUserOptions.find(uo => result.performedBy && uo.displayName === getUserDisplayName(result.performedBy));
 
         if (!userOption)
             return;
@@ -345,7 +345,7 @@ const EditResults = (props: ResultsComponentProps) => {
             if (!r.performedBy) 
                 return false;
 
-            return selectedOption.displayName === getDisplayName(r.performedBy);
+            return selectedOption.displayName === getUserDisplayName(r.performedBy);
         });
 
         if (!!existingResultForCompetitor) {
@@ -656,7 +656,7 @@ const EditResults = (props: ResultsComponentProps) => {
 
     else return (
         <>
-            <div className='info-container'>
+            <div className='container info-container full-width-scrollable-container'>
                 {state.contest.name} { props.isEditingMode ? ' - ввод результатов' : ' - результаты' }
             </div>
             {roundTabs}
@@ -682,7 +682,7 @@ const EditResults = (props: ResultsComponentProps) => {
                                     <td className='td-name' onClick={() => onUserClick(r.performedBy?.id ?? null)}>
                                         <p className='user-name'>
                                             {
-                                                r.performedBy && getDisplayName(r.performedBy)
+                                                r.performedBy && getUserDisplayName(r.performedBy)
                                             }
                                         </p>
                                     </td>

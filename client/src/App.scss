@@ -1,6 +1,7 @@
 @import './styles/colors.scss';
 @import './styles/mixins.scss';
 @import './styles/fonts.scss';
+@import './styles/layout.scss';
 
 html, body, #root {
     margin: 0;
@@ -85,11 +86,8 @@ input {
 }
 
 .info-container {
-    background-color: #394252;
-    padding: 25px 0;
-    height: auto;
-    text-align: center;
-    border-radius: 10px;
+    padding: 25px 30px;
+    box-sizing: border-box;
     font-size: $fs-large;
 }
 
@@ -99,6 +97,11 @@ input {
     height: auto;
     text-align: center;
     border-radius: 10px;
+}
+
+.full-width-scrollable-container {
+    min-width: $container-min-width;
+    box-sizing: border-box;
 }
 
 .notifications {

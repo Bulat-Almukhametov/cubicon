@@ -1,10 +1,11 @@
 @import '../styles/mixins.scss';
 @import '../styles/colors.scss';
+@import '../styles/layout.scss';
 
 .create-contest-form {
     font-size: 15px;
     margin-top: 25px;
-    padding: 25px;
+    padding: 30px;
     background-color: $secondary;
     height: auto;
     border-radius: 10px;

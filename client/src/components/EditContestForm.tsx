@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { HttpResponseStatusCode } from "../enums";
 import { City, ErrorHandlerProps, RoundFormat, User } from "../models/state";
+import { getUserDisplayName } from "../services/users.helper";
 import "./EditContestForm.scss";
 import Autocomplete, { AutocompleteOption } from "./shared/Autocomplete";
 import ContestNotFound from "./shared/ContestNotFound";
@@ -113,8 +114,9 @@ const EditContestForm = (props: ErrorHandlerProps) => {
                 const allUserOptions = users.map((u: User) => {
                     return new AutocompleteOption(u.id, getUserDisplayName(u), false);
                 });
+
                 const allCityOptions = cities.map((c: City) => {
-                    return new AutocompleteOption(c.id, c.name);
+                    return new AutocompleteOption(c.id, `${c.name} - ${c.region.name}`);
                 });
 
                 if (isAddNewMode) {
@@ -148,7 +150,7 @@ const EditContestForm = (props: ErrorHandlerProps) => {
 
                 // preselect city autocomplete with contest data
                 const city = cities.find((c: City) => c.id === contestInfo.cityId);
-                setSelectedCityOption(new AutocompleteOption(city.id, city.name));
+                setSelectedCityOption(new AutocompleteOption(city.id, `${city.name} (${city.region.name})`));
 
                 setStatus(EditContestPageStatus.Loaded);
             })
@@ -201,10 +203,6 @@ const EditContestForm = (props: ErrorHandlerProps) => {
                 cityId: null,
             }
         });
-    }
-
-    const getUserDisplayName = (user: User): string => {
-        return `${user.firstName} ${user.lastName}`;
     }
 
     const onSubmitButtonClick = async () => {
@@ -320,11 +318,11 @@ const EditContestForm = (props: ErrorHandlerProps) => {
             {
                 status === EditContestPageStatus.Loaded &&
                 <>
-                    <div className="info-container">
+                    <div className="info-container container full-width-scrollable-container">
                         {contestIdNum === 0 ? 'Создание нового контеста' : formState.name + ' - Редактирование контеста'}
                     </div>
                     <div inline-datepicker="true" data-date="02/25/2022"></div>
-                    <div className="create-contest-form">
+                    <div className="create-contest-form full-width-scrollable-container">
                         <table className="main-info-table">
                             <tbody>
                                 <tr>

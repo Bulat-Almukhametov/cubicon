@@ -16,7 +16,7 @@ model User {
     firstName            String
     lastName             String
     cityId               Int
-    city                 City    @relation(fields: [cityId], references: [id])
+    city                 City    @relation(fields: [cityId], references: [id], onDelete: Cascade)
     organizedContests    Contest[]
     results              Result[]
 
@@ -30,9 +30,9 @@ model Contest {
     vkUrl         String?
     status        ContestStatus @default(NEW)
     cityId        Int
-    city          City          @relation(fields: [cityId], references: [id])
-    organizedById Int?
-    organizedBy   User?         @relation(fields: [organizedById], references: [id])
+    city          City          @relation(fields: [cityId], references: [id],  onDelete: Cascade)
+    organizedById Int
+    organizedBy   User          @relation(fields: [organizedById], references: [id], onDelete: Cascade)
     rounds        Round[]
 }
 
@@ -68,7 +68,7 @@ model Result {
     roundId       Int
     round         Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
     performedById Int
-    performedBy   User   @relation(fields: [performedById], references: [id])
+    performedBy   User   @relation(fields: [performedById], references: [id], onDelete: Cascade)
 }
 
 model Region {
